@@ -10,7 +10,7 @@
  */
 
 import { Socket } from "node:net";
-import { existsSync, mkdirSync, copyFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -699,8 +699,16 @@ export class WorkbenchClient {
     const targetBase = modDir || join(fallbackBase!, HANDLER_FOLDER);
     const targetScriptsDir = join(targetBase, "Scripts", "WorkbenchGame", HANDLER_FOLDER);
 
-    // Already installed? Skip unless force-reinstalling (e.g. recovery after missing handlers)
+    // Ping alone cannot establish that the rest of the deployed API is current.
+    // Preserve existing project edits and require an intentional sync on drift.
     if (!force && existsSync(join(targetScriptsDir, "EMCP_WB_Ping.c"))) {
+      const outdated = readdirSync(bundledDir).filter(f => f.endsWith(".c")).filter(f =>
+        !existsSync(join(targetScriptsDir, f)) ||
+        readFileSync(join(targetScriptsDir, f), "utf8").replace(/\r\n/g, "\n") !==
+        readFileSync(join(bundledDir, f), "utf8").replace(/\r\n/g, "\n"));
+      if (outdated.length) throw new WorkbenchError(
+        `Installed handler scripts differ from this MCP build: ${outdated.join(", ")}. ` +
+        `Review and synchronize ${bundledDir} to ${targetScriptsDir}, then restart Workbench.`, "LAUNCH_FAILED");
       return;
     }
 
