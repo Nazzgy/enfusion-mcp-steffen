@@ -43,6 +43,13 @@ class EMCP_WB_Reload : NetApiHandler
 		if (target == "")
 			target = "scripts";
 
+		if (target != "scripts" && target != "plugins" && target != "both")
+		{
+			resp.status = "error";
+			resp.message = "Unknown reload target: " + target;
+			return resp;
+		}
+		bool accepted = true;
 		array<string> results = {};
 
 		if (target == "scripts" || target == "both")
@@ -90,10 +97,17 @@ class EMCP_WB_Reload : NetApiHandler
 					}
 				}
 
-				results.Insert("Scripts: compilation triggered (ExecuteAction=" + compiled.ToString() + ")");
+				if (compiled)
+					results.Insert("Scripts: reload action dispatched; compilation success is not verified.");
+				else
+				{
+					accepted = false;
+					results.Insert("Scripts: ExecuteAction returned false for all attempted paths; use Script Editor Shift+F7 and inspect the compile log.");
+				}
 			}
 			else
 			{
+				accepted = false;
 				results.Insert("Scripts: ScriptEditor module not available");
 			}
 		}
@@ -107,15 +121,23 @@ class EMCP_WB_Reload : NetApiHandler
 				menuPath.Insert("Plugins");
 				menuPath.Insert("Reload");
 				bool result = resMgr.ExecuteAction(menuPath);
-				results.Insert("Plugins: reload triggered (ExecuteAction=" + result.ToString() + ")");
+				if (result)
+					results.Insert("Plugins: reload action dispatched; completion is not verified.");
+				else
+				{
+					accepted = false;
+					results.Insert("Plugins: ExecuteAction returned false; reload was not dispatched.");
+				}
 			}
 			else
 			{
+				accepted = false;
 				results.Insert("Plugins: ResourceManager module not available");
 			}
 		}
 
-		resp.status = "ok";
+		resp.status = "requested";
+		if (!accepted) resp.status = "error";
 		string msg = "";
 		for (int i = 0; i < results.Count(); i++)
 		{

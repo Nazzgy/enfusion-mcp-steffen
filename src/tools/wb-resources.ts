@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { actionRejected } from "../workbench/outcome.js";
 import type { WorkbenchClient } from "../workbench/client.js";
 import { formatConnectionStatus, requireEditMode } from "../workbench/status.js";
 
@@ -8,13 +9,14 @@ export function registerWbResources(server: McpServer, client: WorkbenchClient):
     "wb_resources",
     {
       description:
-        "Manage Workbench resources. Register new resources, rebuild resource databases, get resource info, or open a resource in its editor. " +
+        "Manage Workbench resources. Register new resources, request resource rebuilds, get resource info, or open a resource in its editor. " +
         "To SEARCH for resources by name, use asset_search (searches base game data and .pak archives offline) — this tool cannot list or browse.",
       inputSchema: {
+        configuration: z.enum(["PC", "XBOX_ONE", "XBOX_SERIES", "PS4", "PS5", "HEADLESS"]).default("PC").describe("Target configuration for rebuild. Completion must be checked in the native build log."),
         action: z
           .enum(["register", "rebuild", "getInfo", "open"])
           .describe(
-            "Action: register (add resource to DB), rebuild (regenerate resource DB), getInfo (resource metadata), open (open in editor)"
+            "Action: register (add resource to DB), rebuild (request a single resource build, not the resource database), getInfo (resource metadata), open (open in editor)"
           ),
         path: z
           .string()
@@ -22,10 +24,10 @@ export function registerWbResources(server: McpServer, client: WorkbenchClient):
         buildRuntime: z
           .boolean()
           .optional()
-          .describe("Build runtime data during register/rebuild (slower but ensures assets are ready)"),
+          .describe("Build runtime data during register. Rebuild always uses the selected configuration."),
       },
     },
-    async ({ action, path, buildRuntime }) => {
+    async ({ action, path, buildRuntime, configuration }) => {
       try {
         // Mutating actions require edit mode
         if (action === "register" || action === "rebuild") {
@@ -66,22 +68,23 @@ export function registerWbResources(server: McpServer, client: WorkbenchClient):
         }
 
         // register, rebuild, open all use EMCP_WB_Resources
-        const params: Record<string, unknown> = { action, path };
+        const params: Record<string, unknown> = { action, path, configuration };
         if (buildRuntime !== undefined) params.buildRuntime = buildRuntime;
 
         const result = await client.call<Record<string, unknown>>("EMCP_WB_Resources", params);
 
         const actionLabels: Record<string, string> = {
           register: `Registered resource: ${path}`,
-          rebuild: `Rebuilt resource database for: ${path}`,
+          rebuild: `Resource rebuild requested (${configuration}): ${path}. Completion not verified; inspect the native build log.`,
           open: `Opened resource: ${path}`,
         };
 
         return {
+          isError: actionRejected(result),
           content: [
             {
               type: "text" as const,
-              text: `**${actionLabels[action]}**${result.message ? `\n\n${result.message}` : ""}${formatConnectionStatus(client)}`,
+              text: `**${actionRejected(result) ? "Resource action failed" : actionLabels[action]}**${result.message ? `\n\n${result.message}` : ""}${formatConnectionStatus(client)}`,
             },
           ],
         };

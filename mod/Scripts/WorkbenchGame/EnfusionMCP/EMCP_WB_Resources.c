@@ -10,12 +10,14 @@ class EMCP_WB_ResourcesRequest : JsonApiStruct
 {
 	string action;
 	string path;
+	string configuration;
 	bool buildRuntime;
 
 	void EMCP_WB_ResourcesRequest()
 	{
 		RegV("action");
 		RegV("path");
+		RegV("configuration");
 		RegV("buildRuntime");
 	}
 }
@@ -101,13 +103,18 @@ class EMCP_WB_Resources : NetApiHandler
 			if (result)
 				resp.message = "Resource registered: " + req.path;
 			else
+			{
+				resp.status = "error";
 				resp.message = "RegisterResourceFile returned false for: " + req.path;
+			}
 		}
 		else if (req.action == "rebuild")
 		{
-			resMgr.RebuildResourceFile(req.path, "", false);
-			resp.status = "ok";
-			resp.message = "Rebuild initiated for: " + req.path;
+			string configuration = req.configuration;
+			if (configuration == "") configuration = "PC";
+			resMgr.RebuildResourceFile(req.path, configuration, false);
+			resp.status = "requested";
+			resp.message = "Rebuild requested for: " + req.path + " (" + configuration + "). Completion is not verified; inspect the native build log.";
 		}
 		else if (req.action == "open")
 		{
@@ -116,7 +123,10 @@ class EMCP_WB_Resources : NetApiHandler
 			if (result)
 				resp.message = "Opened resource: " + req.path;
 			else
+			{
+				resp.status = "error";
 				resp.message = "SetOpenedResource returned false for: " + req.path;
+			}
 		}
 		else if (req.action == "browse")
 		{

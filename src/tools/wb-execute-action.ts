@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { actionRejected } from "../workbench/outcome.js";
 import type { WorkbenchClient } from "../workbench/client.js";
 import { formatConnectionStatus, requireEditMode } from "../workbench/status.js";
 
@@ -19,6 +20,7 @@ export function registerWbExecuteAction(server: McpServer, client: WorkbenchClie
         "Execute any Workbench menu action by its menu path. Use comma-separated path segments to identify the action (e.g., 'Tools,Reload Scripts' or 'File,Save'). " +
         "Some destructive actions (File,Close; File,New; File,Exit) are blocked for safety.",
       inputSchema: {
+        module: z.enum(["WorldEditor", "ScriptEditor", "ResourceManager", "AudioEditor", "AnimEditor", "ParticleEditor", "BehaviorEditor", "LocalizationEditor"]).default("WorldEditor").describe("Editor that owns the menu. Audio conversion is AudioEditor > Tools > File Converter."),
         menuPath: z
           .string()
           .describe(
@@ -26,12 +28,12 @@ export function registerWbExecuteAction(server: McpServer, client: WorkbenchClie
           ),
       },
     },
-    async ({ menuPath }) => {
+    async ({ menuPath, module }) => {
       try {
         // Block known-destructive menu paths
-        const normalizedPath = menuPath.trim();
+        const normalizedPath = menuPath.split(",").map(part => part.trim()).join(",");
         for (const blocked of BLOCKED_MENU_PREFIXES) {
-          if (normalizedPath.startsWith(blocked)) {
+          if (normalizedPath.toLowerCase().startsWith(blocked.toLowerCase())) {
             return {
               content: [{
                 type: "text" as const,
@@ -47,14 +49,16 @@ export function registerWbExecuteAction(server: McpServer, client: WorkbenchClie
           return { content: [{ type: "text" as const, text: modeErr + formatConnectionStatus(client) }] };
         }
         const result = await client.call<Record<string, unknown>>("EMCP_WB_ExecuteAction", {
-          menuPath,
+          menuPath: normalizedPath,
+          module,
         });
 
         return {
+          isError: actionRejected(result),
           content: [
             {
               type: "text" as const,
-              text: `**Action Executed**\n\nMenu path: ${menuPath}${result.message ? `\n${result.message}` : ""}${result.result ? `\nResult: ${JSON.stringify(result.result)}` : ""}${formatConnectionStatus(client)}`,
+              text: `**${actionRejected(result) ? "Action not executed" : "Action dispatched (completion not verified)"}**\n\nModule: ${module}\nMenu path: ${normalizedPath}${result.message ? `\n${result.message}` : ""}${result.result ? `\nResult: ${JSON.stringify(result.result)}` : ""}${formatConnectionStatus(client)}`,
             },
           ],
         };

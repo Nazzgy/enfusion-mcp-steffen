@@ -101,12 +101,12 @@ class EMCP_WB_ExecuteAction : NetApiHandler
 		while (commaIdx >= 0)
 		{
 			string part = remaining.Substring(0, commaIdx);
-			part.Trim();
+			part = part.Trim();
 			parts.Insert(part);
 			remaining = remaining.Substring(commaIdx + 1, remaining.Length() - commaIdx - 1);
 			commaIdx = remaining.IndexOf(",");
 		}
-		remaining.Trim();
+		remaining = remaining.Trim();
 		if (remaining.Length() > 0)
 			parts.Insert(remaining);
 
@@ -126,6 +126,7 @@ class EMCP_WB_ExecuteAction : NetApiHandler
 		}
 		else
 		{
+			resp.status = "error";
 			resp.executed = 0;
 			resp.message = "ExecuteAction returned false (action may not exist or is unavailable)";
 		}
