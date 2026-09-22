@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { WorkbenchClient } from "../workbench/client.js";
+import { actionRejected } from "../workbench/outcome.js";
 import { formatConnectionStatus, requireEditMode, requirePlayMode } from "../workbench/status.js";
 
 export function registerWbEditorTools(server: McpServer, client: WorkbenchClient): void {
@@ -188,14 +189,20 @@ export function registerWbEditorTools(server: McpServer, client: WorkbenchClient
     "wb_open_resource",
     {
       description:
-        "Open a resource file in the appropriate Workbench editor (e.g., a .et prefab in the Prefab Editor, a .c script in the Script Editor).",
+        "Open a resource file through Workbench's editor routing, including .bt files in Behavior Editor and .c scripts in Script Editor. Requires the updated EMCP_WB_EditorControl handler. Layout resources are excluded because this route is unsafe for them; use native layout workflows.",
       inputSchema: {
         path: z
           .string()
-          .describe("Resource path to open (e.g., 'Prefabs/Weapons/AK47.et', 'Scripts/Game/MyScript.c')"),
+          .describe("Resource path to open (e.g., 'AI/BehaviorTrees/Chimera/Soldier/LookAt.bt', 'Prefabs/Weapons/AK47.et', 'Scripts/Game/MyScript.c')"),
       },
     },
     async ({ path }) => {
+      if (path.trim().toLowerCase().endsWith(".layout")) {
+        return {
+          isError: true,
+          content: [{ type: "text" as const, text: "Layout resources must be opened through native layout workflows. Generic Workbench resource opening has caused a LayoutResourceClass crash." }],
+        };
+      }
       try {
         const result = await client.call<Record<string, unknown>>("EMCP_WB_EditorControl", {
           action: "openResource",
@@ -206,9 +213,10 @@ export function registerWbEditorTools(server: McpServer, client: WorkbenchClient
           content: [
             {
               type: "text" as const,
-              text: `**Resource Opened**\n\nOpened: ${path}${result.message ? `\n${result.message}` : ""}${formatConnectionStatus(client)}`,
+              text: `**${actionRejected(result) ? "Resource open failed" : "Resource open accepted"}**\n\nPath: ${path}${result.message ? `\n${result.message}` : ""}\nInspect the destination editor and its console for resource diagnostics.${formatConnectionStatus(client)}`,
             },
           ],
+          isError: actionRejected(result),
         };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

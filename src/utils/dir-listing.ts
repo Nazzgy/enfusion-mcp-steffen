@@ -14,6 +14,7 @@ export const FILE_TYPE_MAP: Record<string, string> = {
   ".edds": "texture",
   ".xob": "model",
   ".layout": "ui-layout",
+  ".bt": "behavior-tree",
   ".emat": "material",
   ".sounds": "sound",
 };

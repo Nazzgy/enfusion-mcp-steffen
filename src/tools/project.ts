@@ -10,7 +10,7 @@ import { listDirectory, formatSize } from "../utils/dir-listing.js";
 /** Extensions safe to read as text. Mirrors game_read's list. */
 const TEXT_EXTENSIONS = new Set([
   ".c", ".et", ".conf", ".gproj", ".ent", ".layer", ".st",
-  ".layout", ".txt", ".json", ".xml", ".csv", ".md",
+  ".layout", ".bt", ".txt", ".json", ".xml", ".csv", ".md",
 ]);
 
 /** Upper bound on a single read, matching game_read's 500 KB ceiling. */

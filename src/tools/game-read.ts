@@ -10,7 +10,7 @@ import { resolveGameDataPath } from "../utils/game-paths.js";
 /** Extensions that are safe to read as text */
 const TEXT_EXTENSIONS = new Set([
   ".c", ".et", ".conf", ".gproj", ".ent", ".layer", ".st",
-  ".layout", ".txt", ".json", ".xml", ".csv",
+  ".layout", ".bt", ".txt", ".json", ".xml", ".csv",
 ]);
 
 export function registerGameRead(server: McpServer, config: Config): void {
@@ -21,7 +21,7 @@ export function registerGameRead(server: McpServer, config: Config): void {
         "Read a file from the base game data. " +
         "Reads from both unpacked files and .pak archives transparently. " +
         "Use this to read vanilla .c script files to understand what to override, " +
-        "or inspect prefab .et files and config .conf files.",
+        "or inspect prefab .et files, config .conf files, and Behavior Editor .bt trees.",
       inputSchema: {
         path: z
           .string()

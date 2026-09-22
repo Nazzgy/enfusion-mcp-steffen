@@ -16,7 +16,8 @@ interface AssetEntry {
   guid?: string;
 }
 
-const ASSET_EXTENSIONS = new Set([".et", ".xob", ".edds", ".c", ".conf", ".emat", ".layout", ".sounds"]);
+// Behavior trees are text resources used by Behavior Editor, including in PAKs.
+const ASSET_EXTENSIONS = new Set([".et", ".xob", ".edds", ".c", ".conf", ".emat", ".layout", ".sounds", ".bt"]);
 
 const TYPE_FILTER: Record<string, string[]> = {
   prefab: [".et"],
@@ -26,6 +27,7 @@ const TYPE_FILTER: Record<string, string[]> = {
   config: [".conf"],
   material: [".emat"],
   layout: [".layout"],
+  behavior: [".bt"],
 };
 
 /** Cached file index — built once per session */
@@ -190,7 +192,7 @@ export function registerAssetSearch(server: McpServer, config: Config): void {
     "asset_search",
     {
       description:
-        "Search for base game assets (prefabs, models, textures, scripts, configs) by name. " +
+        "Search for base game assets (prefabs, models, textures, scripts, configs, behavior trees) by name. " +
         "Searches both unpacked files and .pak archives transparently. " +
         "Returns file paths and GUIDs (for prefabs) that can be used in prefab references. " +
         "The first search may take a few seconds to build the file index.",
@@ -199,9 +201,9 @@ export function registerAssetSearch(server: McpServer, config: Config): void {
           .string()
           .describe("Search term to match against file names (e.g., 'AK47', 'BarrelGreen', 'soldier')"),
         type: z
-          .enum(["prefab", "model", "texture", "script", "config", "material", "layout", "any"])
+          .enum(["prefab", "model", "texture", "script", "config", "material", "layout", "behavior", "any"])
           .default("any")
-          .describe("Filter by asset type"),
+          .describe("Filter by asset type; behavior finds Behavior Editor .bt resources"),
         limit: z
           .number()
           .min(1)

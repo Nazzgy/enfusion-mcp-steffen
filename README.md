@@ -97,9 +97,9 @@ Work without Workbench running — API search, mod scaffolding, code generation,
 | `wiki_read` | Read the full content of a wiki page by title — no truncation, includes code examples |
 | `wb_knowledge` | Search the bundled Arma Reforger modding knowledge base — distilled patterns covering scripting, audio, weapons, vehicles, AI, UI, game modes, animation, and more |
 | `game_browse` | Browse base game files — loose files and `.pak` archives transparently |
-| `game_read` | Read base game files — scripts, prefabs, configs from loose files or `.pak` |
+| `game_read` | Read base game scripts, prefabs, configs, and `.bt` behavior trees from loose files or `.pak` |
 | `prefab_inspect` | Inspect a prefab's full inheritance chain — merges all components across ancestors, showing which level each value comes from. Solves the problem of `.et` files only showing overrides. |
-| `asset_search` | Search game assets by name across loose files and `.pak` archives |
+| `asset_search` | Search game assets by name across loose files and `.pak` archives; `type="behavior"` finds `.bt` trees |
 | `project_browse` | List files in a mod project directory |
 | `project_read` | Read any project file |
 | `project_write` | Write or update project files |
@@ -125,7 +125,7 @@ Control a running Workbench instance over TCP. Requires the handler scripts inst
 | `wb_stop` | Return to edit mode |
 | `wb_save` | Save the current world |
 | `wb_undo_redo` | Undo or redo the last action |
-| `wb_open_resource` | Open a resource in its editor |
+| `wb_open_resource` | Route resources, including `.bt`, to their editor and report rejected opens; native layout workflow required for `.layout` |
 | `wb_reload` | Reload scripts or plugins without restarting |
 | `wb_execute_action` | Run any Workbench menu action by path |
 | `wb_entity_create` | Create entity from prefab at a position |

@@ -48,6 +48,41 @@ class EMCP_WB_EditorControl : NetApiHandler
 		EMCP_WB_EditorControlResponse resp = new EMCP_WB_EditorControlResponse();
 		resp.action = req.action;
 
+		// Resource routing belongs to Workbench, not WorldEditor. Vanilla's
+		// SCR_ValidateBehaviorTreesPlugin uses this entry point for .bt files.
+		// Handle it before acquiring WorldEditor so other editors work independently.
+		if (req.action == "openResource")
+		{
+			string resourcePath = req.path.Trim();
+			if (resourcePath == "")
+			{
+				resp.status = "error";
+				resp.message = "path parameter required for openResource action";
+				return resp;
+			}
+
+			string lowerPath = resourcePath;
+			lowerPath.ToLower();
+			if (lowerPath.EndsWith(".layout"))
+			{
+				resp.status = "error";
+				resp.message = "Generic resource opening is unsafe for LayoutResourceClass. Use the native layout workflow.";
+				return resp;
+			}
+
+			if (Workbench.OpenResource(resourcePath))
+			{
+				resp.status = "ok";
+				resp.message = "Workbench accepted resource open: " + resourcePath + ". Inspect the destination editor for resource diagnostics.";
+			}
+			else
+			{
+				resp.status = "error";
+				resp.message = "Workbench.OpenResource returned false for: " + resourcePath;
+			}
+			return resp;
+		}
+
 		WorldEditor worldEditor = Workbench.GetModule(WorldEditor);
 		if (!worldEditor)
 		{
@@ -112,23 +147,6 @@ class EMCP_WB_EditorControl : NetApiHandler
 			worldEditor.ExecuteAction(menuPath);
 			resp.status = "ok";
 			resp.message = "Redo executed";
-		}
-		else if (req.action == "openResource")
-		{
-			if (req.path == "")
-			{
-				resp.status = "error";
-				resp.message = "path parameter required for openResource action";
-			}
-			else
-			{
-				bool opened = worldEditor.SetOpenedResource(req.path);
-				resp.status = "ok";
-				if (opened)
-					resp.message = "Opened resource: " + req.path;
-				else
-					resp.message = "SetOpenedResource returned false for: " + req.path;
-			}
 		}
 		else
 		{
