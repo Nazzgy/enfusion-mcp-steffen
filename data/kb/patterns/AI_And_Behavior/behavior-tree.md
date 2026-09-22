@@ -1,5 +1,10 @@
 # Behavior Tree (AI)
 
+For the observed Workbench 1.8 editor workflow, `.bt` serialization, current script
+signatures, and MCP discovery/opening limits, query `wb_knowledge` for
+`Behavior Editor Workflow and MCP`. This page summarizes concepts from the BIKI;
+its node catalog is not an exhaustive list of the current native palette.
+
 ---
 
 ## Overview
@@ -44,7 +49,9 @@
 2. In `AIControlComponent`: set `OverrideAIBehaviorData` to your `.bt` file; tick "Enable AI".
 3. Run game with BT Editor open → click soldier in right panel debug list.
 
-**Pitfall:** BT variable outputs cannot connect directly to task inputs — store in a typed variable first.
+**Pitfall:** Task outputs cannot connect directly to another task's inputs. Connect
+the producer output to a typed variable reference's Set pin, then connect its Get
+pin to the consumer input. Also connect the tasks into the control-flow tree.
 
 ---
 
@@ -57,7 +64,10 @@
 | Blue | Running |
 | Dark red | Suspended at breakpoint |
 
-Breakpoints stop BT execution on that node but game continues running.
+Breakpoints suspend execution at that node while the game continues running.
+Other branches under a Parallel ancestor can continue. Runtime debug views are
+read-only; edit the source `.bt`, not the displayed runtime instance. These runtime
+semantics are documented by BIKI and were not exercised in the 2026-09-22 study.
 
 ---
 
@@ -72,7 +82,7 @@ Breakpoints stop BT execution on that node but game continues running.
 | `Repeater` | Sequence repeated N times | `Repeat Times` (default 1) |
 | `Run BT` | Runs another BT on agent | `Behavior Tree`, `Run Repeatedly`, `InBehaviorTree` input |
 | `Run Once` | Executes once on init | Always returns Success |
-| `Run On Entity` | Executes children on a different entity | Input: Entity |
+| `Run On Entity` | Executes children on a different entity | Input: Entity; BIKI cautions against children returning Running because entity scope is not switched for that case |
 | `Switch` | Picks child by variable value or random | `Values Array`, `Random Range`, `Abort Variable Changed`, `InVariable` |
 | `For Each Child` | Iterates AI group children | `Index from/to`, `Return controlled entity`; Output: Entity |
 
@@ -107,7 +117,12 @@ Conditional wrappers — evaluate a test, optionally execute child. All share:
 
 ## Task Nodes
 
-**Key rule:** Async tasks that return `Running` must override `CanReturnRunning()` → return `true`.
+**Key rule:** Tasks that can return `ENodeResult.RUNNING` declare
+`static override bool CanReturnRunning() { return true; }`. Current task callbacks
+take `AIAgent`, and task results use uppercase `ENodeResult.SUCCESS`, `FAIL`, and
+`RUNNING`. Do not copy the old BIKI sample's `IEntity` callback signature or mixed
+case enum spellings into current scripts. See `Node.c`, `AITaskScripted.c`, and
+`SCR_AITaskTimerGate.c` in the installed vanilla scripts.
 
 ### General Tasks
 

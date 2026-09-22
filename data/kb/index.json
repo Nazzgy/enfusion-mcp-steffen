@@ -150,6 +150,12 @@
     "keywords": ["vehicle", "car", "truck", "tank", "fuel", "simulation", "wheeled", "slot", "component", "damage", "faction", "mod", "create", "setup"]
   },
   {
+    "path": "AI_And_Behavior/behavior-editor.md",
+    "title": "Behavior Editor Workflow and MCP",
+    "description": "Behavior Editor UI, .bt discovery/opening, variables and port serialization, current scripted node API, native warnings, and MCP limitations",
+    "keywords": ["behavior", "behaviour", "editor", "behavioreditor", "bt", "workbench", "mcp", "palette", "variables", "ports", "serialization", "breakpoint", "open", "asset_search", "wb_open_resource", "game_read"]
+  },
+  {
     "path": "AI_And_Behavior/behavior-tree.md",
     "title": "Behavior Tree",
     "description": "BT Editor UI/shortcuts, all node types (Flow/Decorator/Task), debug colors, AI Debug Panel, BaseContainer API",
