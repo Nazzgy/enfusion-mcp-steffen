@@ -9,6 +9,8 @@ export function formatConnectionStatus(client: WorkbenchClient): string {
   if (!connected) return "\n\n---\n`Workbench: disconnected`";
   if (mode === "play") return "\n\n---\n`Workbench: play mode`";
   if (mode === "edit") return "\n\n---\n`Workbench: edit mode`";
+  if (mode === "transitioning") return "\n\n---\n`Workbench: transitioning (mode not confirmed)`";
+  if (mode === "no_world_editor") return "\n\n---\n`Workbench: World Editor not loaded`";
   return "\n\n---\n`Workbench: connected (mode unknown)`";
 }
 
@@ -22,7 +24,7 @@ export function requireEditMode(client: WorkbenchClient, toolAction: string): st
   if (client.state.mode === "play") {
     return `Cannot ${toolAction} while in play mode. Call \`wb_stop\` first to return to edit mode.`;
   }
-  if (client.state.mode === "unknown") {
+  if (client.state.mode !== "edit") {
     return `Cannot ${toolAction}: Workbench mode is unknown. Call \`wb_state\` first to confirm edit mode.`;
   }
   return null;
@@ -37,7 +39,7 @@ export function requirePlayMode(client: WorkbenchClient, toolAction: string): st
   if (client.state.mode === "edit") {
     return `Cannot ${toolAction} while in edit mode. Call \`wb_play\` first to enter play mode.`;
   }
-  if (client.state.mode === "unknown") {
+  if (client.state.mode !== "play") {
     return `Cannot ${toolAction}: Workbench mode is unknown. Call \`wb_state\` first to confirm play mode.`;
   }
   return null;

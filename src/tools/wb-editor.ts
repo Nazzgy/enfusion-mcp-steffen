@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { WorkbenchClient } from "../workbench/client.js";
 import { actionRejected } from "../workbench/outcome.js";
-import { formatConnectionStatus, requireEditMode, requirePlayMode } from "../workbench/status.js";
+import { formatConnectionStatus, requireEditMode } from "../workbench/status.js";
 
 export function registerWbEditorTools(server: McpServer, client: WorkbenchClient): void {
   // wb_play — Switch to game mode (Play in Editor)
@@ -23,6 +23,7 @@ export function registerWbEditorTools(server: McpServer, client: WorkbenchClient
       },
     },
     async ({ debugMode, fullScreen }) => {
+      await client.refreshState();
       const modeErr = requireEditMode(client, "start play mode");
       if (modeErr) {
         return { content: [{ type: "text" as const, text: modeErr + formatConnectionStatus(client) }] };
@@ -32,13 +33,14 @@ export function registerWbEditorTools(server: McpServer, client: WorkbenchClient
         if (debugMode !== undefined) params.debugMode = debugMode;
         if (fullScreen !== undefined) params.fullScreen = fullScreen;
 
-        const result = await client.call<Record<string, unknown>>("EMCP_WB_EditorControl", params);
+        const result = await client.requestMode("play", params);
+        const { confirmed } = result;
 
         return {
           content: [
             {
               type: "text" as const,
-              text: `**Play Mode Started**\n\nWorkbench is now compiling and entering game mode.${result.message ? `\n${result.message}` : ""}${formatConnectionStatus(client)}`,
+              text: `**${confirmed ? "Play Mode Confirmed" : "Play Requested (completion unconfirmed)"}**\n\n${result.message ? `\n${result.message}` : ""}${formatConnectionStatus(client)}`,
             },
           ],
         };
@@ -57,24 +59,19 @@ export function registerWbEditorTools(server: McpServer, client: WorkbenchClient
     "wb_stop",
     {
       description:
-        "Stop game mode and return to the World Editor. Equivalent to pressing Stop in the World Editor. Requires play mode.",
+        "Stop game mode and return to the World Editor. Equivalent to pressing Stop in the World Editor. Sends Stop regardless of cached mode, then checks the actual mode.",
       inputSchema: {},
     },
     async () => {
-      const modeErr = requirePlayMode(client, "stop play mode");
-      if (modeErr) {
-        return { content: [{ type: "text" as const, text: modeErr + formatConnectionStatus(client) }] };
-      }
       try {
-        const result = await client.call<Record<string, unknown>>("EMCP_WB_EditorControl", {
-          action: "stop",
-        });
+        const result = await client.requestMode("stop");
+        const { confirmed } = result;
 
         return {
           content: [
             {
               type: "text" as const,
-              text: `**Edit Mode Restored**\n\nWorkbench has returned to edit mode.${result.message ? `\n${result.message}` : ""}${formatConnectionStatus(client)}`,
+              text: `**${confirmed ? "Edit Mode Confirmed" : "Stop Requested (completion unconfirmed)"}**\n\n${result.message ? `\n${result.message}` : ""}${formatConnectionStatus(client)}`,
             },
           ],
         };

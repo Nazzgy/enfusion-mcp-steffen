@@ -3,6 +3,7 @@ import { z } from "zod";
 import { actionRejected } from "../workbench/outcome.js";
 import type { WorkbenchClient } from "../workbench/client.js";
 import { formatConnectionStatus, requireEditMode } from "../workbench/status.js";
+import { runCompilation } from "../workbench/compilation.js";
 
 // Menu paths that are known-safe for read-only or non-destructive use
 const BLOCKED_MENU_PREFIXES = [
@@ -48,17 +49,21 @@ export function registerWbExecuteAction(server: McpServer, client: WorkbenchClie
         if (modeErr) {
           return { content: [{ type: "text" as const, text: modeErr + formatConnectionStatus(client) }] };
         }
-        const result = await client.call<Record<string, unknown>>("EMCP_WB_ExecuteAction", {
+        const params = {
           menuPath: normalizedPath,
           module,
-        });
+        };
+        const compilation = /compile|validate.*scripts|reload.*scripts/i.test(normalizedPath);
+        const result = compilation
+          ? await runCompilation(client, "EMCP_WB_ExecuteAction", params, /reload/i.test(normalizedPath))
+          : await client.call<Record<string, unknown>>("EMCP_WB_ExecuteAction", params);
 
         return {
           isError: actionRejected(result),
           content: [
             {
               type: "text" as const,
-              text: `**${actionRejected(result) ? "Action not executed" : "Action dispatched (completion not verified)"}**\n\nModule: ${module}\nMenu path: ${normalizedPath}${result.message ? `\n${result.message}` : ""}${result.result ? `\nResult: ${JSON.stringify(result.result)}` : ""}${formatConnectionStatus(client)}`,
+              text: `**${actionRejected(result) ? "Action failed" : result.status === "completed" ? "Compilation completed" : "Action outcome unconfirmed"}**\n\nModule: ${module}\nMenu path: ${normalizedPath}${result.message ? `\n${result.message}` : ""}${result.result ? `\nResult: ${JSON.stringify(result.result)}` : ""}${formatConnectionStatus(client)}`,
             },
           ],
         };

@@ -34,24 +34,24 @@ export function registerWbLaunch(
     },
     async ({ gprojPath }) => {
       try {
-        // Remember which addon was requested so other tools default to it
-        if (gprojPath) {
-          config.defaultMod = basename(dirname(resolve(gprojPath)));
-        }
-
         const alreadyRunning = await client.ping();
         if (alreadyRunning) {
+          if (gprojPath) {
+            await client.verifyProject(gprojPath);
+            config.defaultMod = basename(dirname(resolve(gprojPath)));
+          }
           return {
             content: [
               {
                 type: "text" as const,
-                text: `**Workbench Already Running** — NET API is responding. All \`wb_*\` tools are available.${formatConnectionStatus(client)}`,
+                text: `**Workbench Already Running**\nNET API is responding.${gprojPath ? ` Active project verified: ${resolve(gprojPath)}` : " No project was requested or verified."}${formatConnectionStatus(client)}`,
               },
             ],
           };
         }
 
         await client.ensureRunning(gprojPath);
+        if (gprojPath) config.defaultMod = basename(dirname(resolve(gprojPath)));
 
         const modDir = gprojPath ? dirname(resolve(gprojPath)) : null;
         const note = modDir

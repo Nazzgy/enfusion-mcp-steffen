@@ -9,6 +9,7 @@
 class EMCP_WB_ExecuteActionRequest : JsonApiStruct
 {
 	string menuPath;
+	string operationId;
 	//! Which module owns the menu. Empty = WorldEditor, preserving old behaviour.
 	//! Script compilation lives in the ScriptEditor menus and is unreachable otherwise.
 	string module;
@@ -16,6 +17,7 @@ class EMCP_WB_ExecuteActionRequest : JsonApiStruct
 	void EMCP_WB_ExecuteActionRequest()
 	{
 		RegV("menuPath");
+		RegV("operationId");
 		RegV("module");
 	}
 }
@@ -114,6 +116,18 @@ class EMCP_WB_ExecuteAction : NetApiHandler
 		{
 			resp.status = "error";
 			resp.message = "menuPath resolved to empty array";
+			return resp;
+		}
+
+		if (req.operationId != "")
+			Print("[EnfusionMCP compilation " + req.operationId + "]");
+
+		string lowerPath = req.menuPath;
+		lowerPath.ToLower();
+		if (lowerPath.Contains("reload") && (req.module == "ScriptEditor" || lowerPath.Contains("scripts") || lowerPath.Contains("plugins")))
+		{
+			resp.status = "error";
+			resp.message = "Script/plugin reload cannot run inside a script handler. Use the updated wb_reload client.";
 			return resp;
 		}
 

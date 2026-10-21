@@ -34,7 +34,7 @@ const HANDLER_RECOMPILE_TIMEOUT_MS = 30_000;
 /** Interval between polls while waiting for handler script recompilation. */
 const HANDLER_RECOMPILE_POLL_MS = 2_000;
 
-export type WorkbenchMode = "edit" | "play" | "unknown";
+export type WorkbenchMode = "edit" | "play" | "transitioning" | "no_world_editor" | "unknown";
 
 export interface DiagnosticReport {
   host: string;
@@ -94,6 +94,53 @@ export class WorkbenchClient {
   /** Current cached connection state. Updated after every successful call. */
   get state(): Readonly<WorkbenchState> {
     return this._state;
+  }
+
+  /** An acknowledgement is not proof that an asynchronous mode switch finished. */
+  invalidateMode(): void {
+    this._state.mode = "transitioning";
+  }
+
+  async requestMode(action: "play" | "stop", params: Record<string, unknown> = {}): Promise<{ confirmed: boolean; message: string }> {
+    this.invalidateMode();
+    let message = "";
+    try {
+      const result = await this.call<Record<string, unknown>>("EMCP_WB_EditorControl", { ...params, action }, {
+        timeout: 30_000, skipAutoLaunch: true,
+      });
+      message = String(result.message ?? "");
+    } catch (err) {
+      if (!(err instanceof WorkbenchError) || !["TIMEOUT", "PROTOCOL_ERROR"].includes(err.code)) throw err;
+      message = "The switch response was interrupted. The command was not repeated.";
+    }
+    const confirmed = await this.waitForMode(action === "play" ? "play" : "edit");
+    return { confirmed, message };
+  }
+
+  async waitForMode(mode: "edit" | "play", timeout = 30_000): Promise<boolean> {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      try {
+        await this.call("EMCP_WB_GetState", {}, {
+          timeout: Math.min(3000, deadline - Date.now()), skipAutoLaunch: true,
+        });
+        if (this.state.mode === mode) return true;
+      } catch { /* A transition can temporarily drop NET API. Never relaunch here. */ }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    return false;
+  }
+
+  /** Query the active native project, not a mounted dependency or cached default. */
+  async verifyProject(gprojPath: string): Promise<void> {
+    const result = await this.call<Record<string, unknown>>("EMCP_WB_Ping", {}, { skipAutoLaunch: true });
+    const actual = result.projectPath;
+    const normalize = (path: string) => resolve(path).replace(/\\/g, "/").toLowerCase();
+    if (typeof actual !== "string" || !actual || normalize(actual) !== normalize(gprojPath)) {
+      throw new WorkbenchError(
+        `Requested project: ${resolve(gprojPath)}. Active project: ${actual || "unverified (update the Ping handler and restart Workbench)"}. ` +
+        "The existing Workbench was left untouched; open the requested project before retrying.", "LAUNCH_FAILED");
+    }
   }
 
   constructor(
@@ -206,7 +253,7 @@ export class WorkbenchClient {
    */
   async refreshState(): Promise<WorkbenchState> {
     try {
-      await this.call<Record<string, unknown>>("EMCP_WB_GetState");
+      await this.call<Record<string, unknown>>("EMCP_WB_GetState", {}, { skipAutoLaunch: true });
       return { ...this._state };
     } catch {
       this._state = { connected: false, mode: "unknown", lastUpdated: Date.now() };
@@ -226,7 +273,9 @@ export class WorkbenchClient {
 
     // Deduplicate concurrent calls — all callers await the same promise
     if (this.launchPromise) {
-      return this.launchPromise;
+      await this.launchPromise;
+      if (gprojPath) await this.verifyProject(gprojPath);
+      return;
     }
 
     const promise = this.launchWorkbench(gprojPath).finally(() => {
@@ -251,9 +300,10 @@ export class WorkbenchClient {
    */
   async ping(): Promise<boolean> {
     try {
-      await this.rawCall("EMCP_WB_Ping", {}, { timeout: 3000, skipAutoLaunch: true });
+      this.finishCall(await this.rawCall("EMCP_WB_Ping", {}, { timeout: 3000, skipAutoLaunch: true }), {});
       return true;
     } catch {
+      this._state = { connected: false, mode: "unknown", lastUpdated: Date.now() };
       return false;
     }
   }
@@ -438,11 +488,14 @@ export class WorkbenchClient {
       const mode = (result as Record<string, unknown>).mode;
       if (mode === "edit") {
         this._state.mode = "edit";
-      } else if (mode === "play" || mode === "game") {
-        // Scripts return "game" when in play mode (WorldEditorAPI unavailable)
+      } else if (mode === "play") {
         this._state.mode = "play";
+      } else if (mode === "transitioning" || mode === "no_world_editor") {
+        this._state.mode = mode;
+      } else {
+        // Legacy "game" meant missing API, not observed play. Clear stale state.
+        this._state.mode = "unknown";
       }
-      // "no_world_editor" and unrecognised values leave mode as-is (stays "unknown")
     }
   }
 
@@ -498,8 +551,12 @@ export class WorkbenchClient {
   }
 
   private async launchWorkbench(gprojPath?: string): Promise<void> {
+    if (gprojPath && (!existsSync(gprojPath) || !gprojPath.toLowerCase().endsWith(".gproj"))) {
+      throw new WorkbenchError(`Project file not found or not a .gproj: ${gprojPath}`, "LAUNCH_FAILED");
+    }
     // 1. Check if already running (maybe it came up between the failed call and now)
     if (await this.ping()) {
+      if (gprojPath) await this.verifyProject(gprojPath);
       logger.info("Workbench is already running.");
       return;
     }
@@ -568,10 +625,12 @@ export class WorkbenchClient {
         await this.rawCall("EMCP_WB_Ping", {}, { timeout: 3000, skipAutoLaunch: true });
         this._state.connected = true;
         this._state.lastUpdated = Date.now();
+        if (resolvedGproj) await this.verifyProject(resolvedGproj);
         logger.info("Workbench NET API is responding.");
         return;
       } catch (err) {
         if (err instanceof WorkbenchError) {
+          if (err.code === "LAUNCH_FAILED") throw err;
           lastErrorCode = err.code;
           logger.debug(`Workbench poll (${err.code}): ${err.message}`);
         }
@@ -839,7 +898,7 @@ export class WorkbenchClient {
         }
 
         try {
-          const result = decodeResponse<T>(responseBuf);
+          const result = decodeResponse<T>(responseBuf, apiFunc === "ReloadScripts");
           logger.debug(`Workbench response for "${apiFunc}":`, result);
           resolve(result);
         } catch (err) {
@@ -883,7 +942,7 @@ export class WorkbenchClient {
         }
 
         try {
-          const result = decodeResponse<T>(responseBuf);
+          const result = decodeResponse<T>(responseBuf, apiFunc === "ReloadScripts");
           resolve(result);
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);

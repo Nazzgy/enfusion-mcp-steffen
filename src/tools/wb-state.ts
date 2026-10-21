@@ -7,7 +7,7 @@ export function registerWbState(server: McpServer, client: WorkbenchClient): voi
     "wb_state",
     {
       description:
-        "Get a full snapshot of the current Workbench state. Returns mode (edit/play), entity count, selected entity count and names, terrain bounds, sub-scene, and prefab edit status.",
+        "Get a full snapshot of the current Workbench state. Returns observed mode (edit/play/unknown/no_world_editor), entity count, selected entity count and names, terrain bounds, sub-scene, and prefab edit status.",
       inputSchema: {},
     },
     async () => {

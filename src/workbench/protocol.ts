@@ -98,7 +98,7 @@ export function encodeRequest(
  * @returns Parsed JSON object from the payload
  * @throws Error if status is not "Ok" or payload JSON is invalid
  */
-export function decodeResponse<T = Record<string, unknown>>(buf: Buffer): T {
+export function decodeResponse<T = Record<string, unknown>>(buf: Buffer, allowEmptyPayload = false): T {
   const { value: status, bytesRead } = decodePascalString(buf, 0);
 
   // Status != "Ok" means an error — throw regardless of trailing data
@@ -118,8 +118,10 @@ export function decodeResponse<T = Record<string, unknown>>(buf: Buffer): T {
         );
       }
     }
+    if (allowEmptyPayload) return {} as T;
     throw new Error("Workbench error: Ok status with empty payload");
   }
 
+  if (allowEmptyPayload) return {} as T;
   throw new Error("Workbench error: Ok status with no payload — possible truncated response");
 }

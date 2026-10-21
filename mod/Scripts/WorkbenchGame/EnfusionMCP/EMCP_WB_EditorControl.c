@@ -93,15 +93,22 @@ class EMCP_WB_EditorControl : NetApiHandler
 
 		if (req.action == "play")
 		{
+			WorldEditorAPI api = worldEditor.GetApi();
+			if (!api || api.IsGameMode())
+			{
+				resp.status = "error";
+				resp.message = "Play requires an available WorldEditorAPI in edit mode";
+				return resp;
+			}
 			worldEditor.SwitchToGameMode(req.debugMode, req.fullScreen);
-			resp.status = "ok";
-			resp.message = "Switched to game mode";
+			resp.status = "requested";
+			resp.message = "Game mode requested; completion must be observed";
 		}
 		else if (req.action == "stop")
 		{
 			worldEditor.SwitchToEditMode();
-			resp.status = "ok";
-			resp.message = "Switched to edit mode";
+			resp.status = "requested";
+			resp.message = "Edit mode requested; completion must be observed";
 		}
 		else if (req.action == "save")
 		{

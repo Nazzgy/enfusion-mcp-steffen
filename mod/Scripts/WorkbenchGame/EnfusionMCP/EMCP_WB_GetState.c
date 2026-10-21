@@ -79,8 +79,8 @@ class EMCP_WB_GetState : NetApiHandler
 		if (!api)
 		{
 			resp.status = "ok";
-			resp.mode = "game";
-			resp.message = "In game mode (WorldEditorAPI not available)";
+			resp.mode = "unknown";
+			resp.message = "WorldEditorAPI unavailable: world may be loading or absent; play is not confirmed";
 
 			// Still get terrain bounds from WorldEditor
 			vector bMin, bMax;
@@ -90,6 +90,14 @@ class EMCP_WB_GetState : NetApiHandler
 				resp.boundsMax = bMax[0].ToString() + " " + bMax[1].ToString() + " " + bMax[2].ToString();
 			}
 
+			return resp;
+		}
+
+		if (api.IsGameMode())
+		{
+			resp.status = "ok";
+			resp.mode = "play";
+			resp.message = "Play mode confirmed by WorldEditorAPI.IsGameMode()";
 			return resp;
 		}
 
