@@ -98,7 +98,31 @@ class EMCP_WB_Resources : NetApiHandler
 
 		if (req.action == "register")
 		{
-			bool result = resMgr.RegisterResourceFile(req.path, req.buildRuntime);
+			string absolutePath;
+			if (!Workbench.GetAbsolutePath(req.path, absolutePath, false))
+			{
+				resp.status = "error";
+				resp.message = "Cannot resolve resource path: " + req.path;
+				return resp;
+			}
+			// RegisterResourceFile opens an interactive "already registered" modal.
+			// Inspect metadata without opening/loading the resource itself first.
+			MetaFile existing = resMgr.GetMetaFile(absolutePath);
+			if (existing)
+			{
+				resp.status = "ok";
+				resp.message = "Resource already registered: " + req.path;
+				if (req.buildRuntime)
+				{
+					string configuration = req.configuration;
+					if (configuration == "") configuration = "PC";
+					resMgr.RebuildResourceFile(absolutePath, configuration, false);
+					resp.status = "requested";
+					resp.message += ". Rebuild requested; inspect the native build log for completion.";
+				}
+				return resp;
+			}
+			bool result = resMgr.RegisterResourceFile(absolutePath, req.buildRuntime);
 			resp.status = "ok";
 			if (result)
 				resp.message = "Resource registered: " + req.path;

@@ -74,7 +74,7 @@ export function registerWbResources(server: McpServer, client: WorkbenchClient):
         const result = await client.call<Record<string, unknown>>("EMCP_WB_Resources", params);
 
         const actionLabels: Record<string, string> = {
-          register: `Registered resource: ${path}`,
+          register: `Resource registration handled: ${path}`,
           rebuild: `Resource rebuild requested (${configuration}): ${path}. Completion not verified; inspect the native build log.`,
           open: `Opened resource: ${path}`,
         };
